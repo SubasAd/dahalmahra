@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dahalmahra - Callbreak Card Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Landing Screen -->
+        <div id="landing" class="screen active">
+            <div class="landing-container">
+                <h1>🎴 Dahalmahra</h1>
+                <p class="subtitle">The Ultimate Callbreak Experience</p>
+
+                <div class="input-group">
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                </div>
+
+                <div class="button-group">
+                    <button id="createRoomBtn" class="btn btn-primary">Create New Room</button>
+                    <div class="divider">or</div>
+                    <div class="join-section">
+                        <input type="text" id="roomCode" placeholder="Room Code" maxlength="4"
+                            style="text-transform: uppercase">
+                        <button id="joinRoomBtn" class="btn btn-secondary">Join Room</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby" class="screen">
+            <div class="lobby-container">
+                <div class="lobby-header">
+                    <h2>Room: <span id="roomIdDisplay">----</span></h2>
+                    <div class="player-count">Players: <span id="playerCount">0</span>/4</div>
+                </div>
+
+                <div class="players-grid">
+                    <div class="player-slot" data-slot="0">
+                        <div class="player-avatar">👤</div>
+                        <div class="player-name">Waiting...</div>
+                    </div>
+                    <div class="player-slot" data-slot="1">
+                        <div class="player-avatar">👤</div>
+                        <div class="player-name">Waiting...</div>
+                    </div>
+                    <div class="player-slot" data-slot="2">
+                        <div class="player-avatar">👤</div>
+                        <div class="player-name">Waiting...</div>
+                    </div>
+                    <div class="player-slot" data-slot="3">
+                        <div class="player-avatar">👤</div>
+                        <div class="player-name">Waiting...</div>
+                    </div>
+                </div>
+
+                <div class="lobby-info">
+                    <p>Waiting for players to join...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game" class="screen">
+            <!-- Game Header -->
+            <div class="game-header">
+                <div class="room-info">Room: <span id="gameRoomId">----</span></div>
+                <div class="round-info">Round: <span id="roundNumber">1</span></div>
+                <div class="master-suit-info">Master: <span id="masterSuitDisplay">Not chosen</span></div>
+            </div>
+
+            <!-- Opponents Area -->
+            <div class="opponents-area">
+                <div class="opponent opponent-top" data-player-id="1">
+                    <div class="opponent-info">
+                        <span class="player-name">Player 1</span>
+                        <span class="team-tag black">Black</span>
+                    </div>
+                    <div class="cards-count">13 cards</div>
+                    <div class="cards-pile"></div>
+                </div>
+
+                <div class="opponent opponent-left" data-player-id="2">
+                    <div class="opponent-info">
+                        <span class="player-name">Player 2</span>
+                        <span class="team-tag red">Red</span>
+                    </div>
+                    <div class="cards-count">13 cards</div>
+                    <div class="cards-pile"></div>
+                </div>
+
+                <div class="opponent opponent-right" data-player-id="3">
+                    <div class="opponent-info">
+                        <span class="player-name">Player 3</span>
+                        <span class="team-tag black">Black</span>
+                    </div>
+                    <div class="cards-count">13 cards</div>
+                    <div class="cards-pile"></div>
+                </div>
+            </div>
+
+            <!-- Game Table -->
+            <div class="game-table">
+                <div class="trick-area" id="trickArea">
+                    <!-- Cards will be placed here during tricks -->
+                </div>
+
+                <!-- Current Trick Info -->
+                <div class="trick-info">
+                    <div id="currentTrickInfo">Lead: None</div>
+                    <div id="turnInfo">Waiting for turn...</div>
+                </div>
+            </div>
+
+            <!-- Player Area -->
+            <div class="player-area">
+                <div class="player-info">
+                    <span class="player-name" id="playerNameDisplay">You</span>
+                    <span class="team-tag" id="playerTeam">Team</span>
+                </div>
+
+                <!-- Player's Hand -->
+                <div class="hand-container" id="handContainer">
+                    <!-- Cards will be rendered here -->
+                </div>
+
+                <!-- Game Controls -->
+                <div class="controls">
+                    <button id="playCardBtn" class="btn btn-action" disabled>Play Selected Card</button>
+                </div>
+            </div>
+
+            <!-- Master Suit Selection Modal -->
+            <div id="masterSuitModal" class="modal">
+                <div class="modal-content">
+                    <h3>Choose Master Suit</h3>
+                    <p>You are the master caller! Select the master suit for this round.</p>
+                    <div class="suit-selection">
+                        <button class="suit-btn" data-suit="Spades">♠️ Spades</button>
+                        <button class="suit-btn" data-suit="Hearts">♥️ Hearts</button>
+                        <button class="suit-btn" data-suit="Diamonds">♦️ Diamonds</button>
+                        <button class="suit-btn" data-suit="Clubs">♣️ Clubs</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Messages -->
+            <div id="gameMessages" class="messages-container"></div>
+        </div>
+
+        <!-- Error Modal -->
+        <div id="errorModal" class="modal">
+            <div class="modal-content">
+                <h3>Error</h3>
+                <p id="errorMessage"></p>
+                <button class="btn btn-primary" onclick="closeErrorModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="client.js"></script>
+</body>
+
+</html>
