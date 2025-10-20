@@ -6,19 +6,99 @@ class DahalmahraClient {
         this.playerName = null;
         this.currentHand = [];
         this.selectedCard = null;
-        this.players = []; // Track all players in the game
-        
+        this.players = [];
         this.initializeEventListeners();
     }
 
+    getSuitOrder(masterSuit) {
+        const redSuits = ['Diamonds', 'Hearts'];
+        const blackSuits = ['Clubs', 'Spades'];
+
+        // Determine if master is red or black
+        const isMasterRed = redSuits.includes(masterSuit);
+
+        // Remove master from its respective array
+        const masterRedSuits = redSuits.filter(suit => suit !== masterSuit);
+        const masterBlackSuits = blackSuits.filter(suit => suit !== masterSuit);
+
+        let order = {};
+        let position = 0;
+
+        // Always start with master suit
+        order[masterSuit] = position++;
+
+        if (isMasterRed) {
+            // Red master: red → black → red → black
+            if (masterBlackSuits.length > 0) order[masterBlackSuits[0]] = position++;
+            if (masterRedSuits.length > 0) order[masterRedSuits[0]] = position++;
+            if (masterBlackSuits.length > 1) order[masterBlackSuits[1]] = position++;
+        } else {
+            // Black master: black → red → black → red
+            if (masterRedSuits.length > 0) order[masterRedSuits[0]] = position++;
+            if (masterBlackSuits.length > 0) order[masterBlackSuits[0]] = position++;
+            if (masterRedSuits.length > 1) order[masterRedSuits[1]] = position++;
+        }
+
+        return order;
+    }
+
+    renderHand() {
+        const handContainer = document.getElementById('handContainer');
+        handContainer.innerHTML = '';
+
+        // Set up container for horizontal layout
+        handContainer.style.position = 'relative';
+        handContainer.style.height = '140px';
+        handContainer.style.textAlign = 'center';
+        handContainer.style.whiteSpace = 'nowrap';
+        handContainer.style.padding = '20px 0';
+
+        // Sort cards using master suit order
+        this.currentHand.sort((a, b) => {
+            if (a.suit !== b.suit) {
+                const suitOrder = this.getSuitOrder(this.masterSuit || 'Spades');
+                return suitOrder[a.suit] - suitOrder[b.suit];
+            }
+            return a.value - b.value;
+        });
+
+        this.currentHand.forEach((card, i) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = `card ${card.suit.toLowerCase()}`;
+            cardEl.setAttribute('data-card', `${card.rank}-${card.suit}`);
+
+            cardEl.innerHTML = `
+            <img src="images/cards/${card.rank.toLowerCase()}_of_${card.suit.toLowerCase()}.svg" 
+                 alt="${card.rank} of ${card.suit}">
+        `;
+
+            // Horizontal overlapping layout
+            const overlap = 30; // pixels of overlap between cards
+            const cardWidth = 90;
+            const totalWidth = (this.currentHand.length * (cardWidth - overlap)) + overlap;
+            const startPosition = (handContainer.offsetWidth - totalWidth) / 2;
+
+            cardEl.style.position = 'relative';
+            cardEl.style.display = 'inline-block';
+            cardEl.style.left = '0';
+            cardEl.style.marginLeft = i === 0 ? '0' : `-${overlap}px`; // Overlap previous card
+            cardEl.style.transform = 'none'; // Remove rotation
+            cardEl.style.zIndex = i; // Leftmost cards behind, rightmost in front
+            cardEl.style.transition = 'all 0.3s ease';
+            cardEl.style.verticalAlign = 'top';
+
+            cardEl.addEventListener('click', () => this.playCard(card, cardEl));
+            handContainer.appendChild(cardEl);
+        });
+    }
     initializeEventListeners() {
         // Landing screen events
         document.getElementById('createRoomBtn').addEventListener('click', () => this.createRoom());
         document.getElementById('joinRoomBtn').addEventListener('click', () => this.joinRoom());
-        
+
         // Game events
         document.getElementById('playCardBtn').addEventListener('click', () => this.playCard());
-        
+
         // Master suit selection
         document.querySelectorAll('.suit-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -31,15 +111,16 @@ class DahalmahraClient {
         document.getElementById('playerName').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.createRoom();
         });
-        
+
         document.getElementById('roomCode').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.joinRoom();
         });
+        console.log(this);
     }
 
     connect() {
         this.socket = io();
-        
+
         this.socket.on('connect', () => {
             console.log('Connected to server');
         });
@@ -98,7 +179,9 @@ class DahalmahraClient {
         });
 
         this.socket.on('trickResult', (data) => {
+            console.log("Trick result data:", data);
             this.showMessage(`${data.winnerName} won the trick!`, 'success');
+            this.updateRoundInfo(data.roundInfo);
             this.clearTrickArea();
         });
 
@@ -110,7 +193,6 @@ class DahalmahraClient {
             this.currentHand = data.yourHand;
             this.showMessage(`Round ${data.roundNumber} started!`, 'info');
             this.renderHand();
-            
             if (data.masterCallerId === this.playerId) {
                 this.showMasterSuitModal();
             }
@@ -135,7 +217,7 @@ class DahalmahraClient {
             this.showError('Please enter your name');
             return;
         }
-        
+
         this.playerName = playerName;
         this.connect();
         this.socket.emit('createRoom', { playerName });
@@ -144,12 +226,12 @@ class DahalmahraClient {
     joinRoom() {
         const playerName = document.getElementById('playerName').value.trim();
         const roomCode = document.getElementById('roomCode').value.trim().toUpperCase();
-        
+
         if (!playerName) {
             this.showError('Please enter your name');
             return;
         }
-        
+
         if (!roomCode) {
             this.showError('Please enter room code');
             return;
@@ -170,11 +252,11 @@ class DahalmahraClient {
     updateLobby() {
         const playerSlots = document.querySelectorAll('.player-slot');
         const playerCount = document.getElementById('playerCount');
-        
+
         playerSlots.forEach(slot => {
             const slotNumber = parseInt(slot.dataset.slot);
             const player = this.players[slotNumber];
-            
+
             if (player) {
                 slot.classList.add('occupied');
                 slot.querySelector('.player-name').textContent = player.name;
@@ -192,9 +274,9 @@ class DahalmahraClient {
                 slot.style.borderColor = '';
             }
         });
-        
+
         playerCount.textContent = this.players.length;
-        
+
         // Update lobby message
         const lobbyInfo = document.querySelector('.lobby-info p');
         if (this.players.length === 4) {
@@ -202,6 +284,7 @@ class DahalmahraClient {
         } else {
             lobbyInfo.textContent = `Waiting for ${4 - this.players.length} more players...`;
         }
+        console.log(this.players);
     }
 
     showGame() {
@@ -220,51 +303,37 @@ class DahalmahraClient {
         }
 
         // Update opponents
+        this.updateOpponents();
+    }
+
+    updateOpponents() {
+
+        const opponentArea = document.querySelector('.opponents-area');
+        const playerId = this.playerId;
+        const positions = ["bottom", "left", "top", "right"];
+
+        // Build mapping from actual player.id → position
+        const layoutMap = {};
+        for (let offset = 0; offset < 4; offset++) {
+            const relativeId = (playerId + offset) % 4;
+            layoutMap[relativeId] = positions[offset];
+        }
+
         this.players.forEach(player => {
-            if (player.id !== this.playerId) {
-                const opponentEl = document.querySelector(`[data-player-id="${player.id}"]`);
-                if (opponentEl) {
-                    opponentEl.querySelector('.player-name').textContent = player.name;
-                    const teamTag = opponentEl.querySelector('.team-tag');
-                    teamTag.textContent = player.teamName;
-                    teamTag.className = `team-tag ${player.teamName?.toLowerCase()}`;
-                }
-            }
+            if (player.id === this.playerId) return;
+            console.log(player, layoutMap[player.id]);
+            opponentArea.insertAdjacentHTML('beforeend', `
+    <div class="opponent opponent-${layoutMap[player.id]}" data-player-id="${player.id}">
+      <div class="opponent-info">
+        <span class="player-name">${player.name}</span>
+        <span class="team-tag ${player.teamName.toLowerCase()}">${player.teamName}</span>
+      </div>
+      <div class="cards-pile"></div>
+    </div>
+  `);
         });
     }
 
-    renderHand() {
-        const handContainer = document.getElementById('handContainer');
-        handContainer.innerHTML = '';
-
-        // Sort cards by suit and value
-        this.currentHand.sort((a, b) => {
-            if (a.suit !== b.suit) {
-                const suitOrder = { 'Spades': 0, 'Hearts': 1, 'Diamonds': 2, 'Clubs': 3 };
-                return suitOrder[a.suit] - suitOrder[b.suit];
-            }
-            return a.value - b.value;
-        });
-
-        this.currentHand.forEach(card => {
-            const cardEl = document.createElement('div');
-            cardEl.className = `card ${card.suit.toLowerCase()}`;
-            cardEl.innerHTML = `
-                <div class="card-corner">
-                    <div class="card-value">${card.rank}</div>
-                    <div class="card-suit">${this.getSuitSymbol(card.suit)}</div>
-                </div>
-                <div class="card-suit large">${this.getSuitSymbol(card.suit)}</div>
-                <div class="card-corner" style="transform: rotate(180deg)">
-                    <div class="card-value">${card.rank}</div>
-                    <div class="card-suit">${this.getSuitSymbol(card.suit)}</div>
-                </div>
-            `;
-            
-            cardEl.addEventListener('click', () => this.selectCard(card, cardEl));
-            handContainer.appendChild(cardEl);
-        });
-    }
 
     getSuitSymbol(suit) {
         const symbols = {
@@ -288,11 +357,20 @@ class DahalmahraClient {
         document.getElementById('playCardBtn').disabled = false;
     }
 
-    playCard() {
-        if (!this.selectedCard) return;
-
-        this.socket.emit('playCard', { card: this.selectedCard });
-        this.selectedCard = null;
+    updateRoundInfo(data) {
+     
+        const roundInfo = document.getElementById('roundInfoBar');
+        roundInfo.innerHTML = `
+            <div>Round: ${data.roundNumber}</div>
+            <div>Scores: 
+                <span class="team-score black">Black  Tens: ${data.Black.tens} | Tricks: ${data.Black.tricks}</span> - <br/>
+                <span class="team-score red">Red  Tens: ${data.Red.tens} | Tricks: ${data.Red.tricks}</span>
+            </div>
+        `;
+    }
+    playCard(card, cardEl) {
+        this.socket.emit('playCard', { card });
+        cardEl.classList.remove('selected');
         document.getElementById('playCardBtn').disabled = true;
     }
 
@@ -307,14 +385,14 @@ class DahalmahraClient {
 
     updateMasterSuit(suit) {
         const masterSuitDisplay = document.getElementById('masterSuitDisplay');
-        masterSuitDisplay.textContent = suit;
+        masterSuitDisplay.textContent = suit.concat(' ', this.getSuitSymbol(suit));
         masterSuitDisplay.className = suit.toLowerCase();
     }
 
     updateTurn(currentPlayerId, playableCards) {
         const isMyTurn = currentPlayerId === this.playerId;
         const turnInfo = document.getElementById('turnInfo');
-        
+
         if (isMyTurn) {
             turnInfo.textContent = 'Your turn!';
             turnInfo.style.color = '#2ecc71';
@@ -336,7 +414,7 @@ class DahalmahraClient {
         document.querySelectorAll('.opponent').forEach(el => {
             el.style.boxShadow = 'none';
         });
-        
+
         // Highlight current player
         if (playerId === this.playerId) {
             // Highlight player's own area
@@ -351,15 +429,15 @@ class DahalmahraClient {
 
     enablePlayableCards(playableCards) {
         const cardElements = document.querySelectorAll('.card');
-        
+
         cardElements.forEach(cardEl => {
             const cardValue = cardEl.querySelector('.card-value').textContent;
             const cardSuit = this.getSuitFromSymbol(cardEl.querySelector('.card-suit').textContent);
-            
-            const isPlayable = playableCards.some(card => 
+
+            const isPlayable = playableCards.some(card =>
                 card.rank === cardValue && card.suit === cardSuit
             );
-            
+
             if (isPlayable) {
                 cardEl.classList.remove('unplayable');
                 cardEl.style.cursor = 'pointer';
@@ -389,18 +467,21 @@ class DahalmahraClient {
 
     handleCardPlayed(data) {
         this.showMessage(`${data.playerName} played ${data.card.rank} of ${data.card.suit}`, 'info');
-        
+        console.log("Handle Card played:", data);
         // Update opponent card counts
         if (data.playerId !== this.playerId) {
             const opponentEl = document.querySelector(`[data-player-id="${data.playerId}"]`);
             if (opponentEl) {
                 const countEl = opponentEl.querySelector('.cards-count');
-                const currentCount = parseInt(countEl.textContent) || 13;
-                countEl.textContent = `${currentCount - 1} cards`;
+                if (countEl) {
+                    const currentCount = parseInt(countEl?.textContent) || 13;
+                    countEl.textContent = `${currentCount - 1} cards`;
+                }
+
             }
         } else {
             // Remove card from hand
-            this.currentHand = this.currentHand.filter(card => 
+            this.currentHand = this.currentHand.filter(card =>
                 !(card.rank === data.card.rank && card.suit === data.card.suit)
             );
             this.renderHand();
@@ -414,15 +495,15 @@ class DahalmahraClient {
         const trickArea = document.getElementById('trickArea');
         const cardEl = document.createElement('div');
         cardEl.className = `trick-card ${card.suit.toLowerCase()}`;
+        const player = this.players.find(p => p.id === playerId);
         cardEl.innerHTML = `
-            <div class="card-value">${card.rank}</div>
-            <div class="card-suit">${this.getSuitSymbol(card.suit)}</div>
-            <div class="played-by">${this.players.find(p => p.id === playerId)?.name || 'Player'}</div>
+            <img src="images/cards/${card.rank.toLowerCase()}_of_${card.suit.toLowerCase()}.svg" 
+                 alt="${card.rank} of ${card.suit}">
+            <div class="played-by">${player?.name || 'Player'}</div>
         `;
-        
-        // Position based on player ID (0: bottom, 1: top, 2: left, 3: right)
         cardEl.style.order = playerId;
-        
+        cardEl.style.color = player?.teamName.toLowerCase()|| 'black';
+
         trickArea.appendChild(cardEl);
     }
 
@@ -436,9 +517,7 @@ class DahalmahraClient {
         const messageEl = document.createElement('div');
         messageEl.className = `message ${type}`;
         messageEl.textContent = message;
-        
         messagesContainer.appendChild(messageEl);
-        
         setTimeout(() => {
             messageEl.remove();
         }, 3000);

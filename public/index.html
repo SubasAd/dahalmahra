@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dahalmahra - Callbreak Card Game</title>
+    <title>Dahalmahra Card Game</title>
     <link rel="stylesheet" href="style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -15,7 +15,7 @@
         <div id="landing" class="screen active">
             <div class="landing-container">
                 <h1>🎴 Dahalmahra</h1>
-                <p class="subtitle">The Ultimate Callbreak Experience</p>
+                <p class="subtitle">The Ultimate Card Experience</p>
 
                 <div class="input-group">
                     <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
@@ -75,35 +75,13 @@
                 <div class="master-suit-info">Master: <span id="masterSuitDisplay">Not chosen</span></div>
             </div>
 
-            <!-- Opponents Area -->
-            <div class="opponents-area">
-                <div class="opponent opponent-top" data-player-id="1">
-                    <div class="opponent-info">
-                        <span class="player-name">Player 1</span>
-                        <span class="team-tag black">Black</span>
-                    </div>
-                    <div class="cards-count">13 cards</div>
-                    <div class="cards-pile"></div>
-                </div>
-
-                <div class="opponent opponent-left" data-player-id="2">
-                    <div class="opponent-info">
-                        <span class="player-name">Player 2</span>
-                        <span class="team-tag red">Red</span>
-                    </div>
-                    <div class="cards-count">13 cards</div>
-                    <div class="cards-pile"></div>
-                </div>
-
-                <div class="opponent opponent-right" data-player-id="3">
-                    <div class="opponent-info">
-                        <span class="player-name">Player 3</span>
-                        <span class="team-tag black">Black</span>
-                    </div>
-                    <div class="cards-count">13 cards</div>
-                    <div class="cards-pile"></div>
-                </div>
+            <div class="round-info-bar" id="roundInfoBar">
+                <!-- Dynamic round information will be displayed here -->
+                
             </div>
+
+            <!-- Opponents Area -->
+            <div class="opponents-area"> </div>
 
             <!-- Game Table -->
             <div class="game-table">

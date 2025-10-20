@@ -10,16 +10,22 @@ export function initializeGameState(room: string): types.GameState {
         pastRounds: [],
     };
 }
+function logAction(action: string, payload: any, state: types.GameState) {
+    console.log(`🚀 [ACTION] ${action}:`, payload);
+    console.log('📊 [STATE AFTER]:', JSON.stringify(state, null, 2));
+    console.log('---');
+}
 
 export function addPlayer(name: string, currentState: types.GameState) {
     if (currentState.players.length >= 4) {
-        console.log("Logic: Attempted to add player to a full game.");
+        logAction("ADD_PLAYER", { name }, currentState);
         return currentState;
     }
     const newPlayerId = currentState.players.length;
     const newPlayer = new types.Player(newPlayerId, name);
     currentState.players.push(newPlayer);
     console.log(`Logic: Player '${name}' added with ID ${newPlayerId}. Total players: ${currentState.players.length}`);
+    logAction("ADD_PLAYER", { name }, currentState);
 }
 
 export function setUpTeams(gameState: types.GameState) {
@@ -45,7 +51,9 @@ export function setUpTeams(gameState: types.GameState) {
     gameState.players.forEach(p => {
         p.teamName = (p.id === 0 || p.id === 2) ? 'Black' : 'Red';
     });
-    console.log('Logic: Teams have been set up.');
+    console.log("Logic: Teams set up - Black (Players 0 & 2), Red (Players 1 & 3).");
+    logAction("SET_UP_TEAMS", {}, gameState);
+
 }
 
 /**
@@ -54,7 +62,7 @@ export function setUpTeams(gameState: types.GameState) {
  */
 export function createDeck(): types.Card[] {
     const suits: types.Card['suit'][] = ['Spades', 'Hearts', 'Diamonds', 'Clubs'];
-    const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King', 'Ace'];
     const deck: types.Card[] = [];
 
     for (const suit of suits) {
@@ -62,10 +70,10 @@ export function createDeck(): types.Card[] {
             let value = 0;
             // Use a switch for clarity
             switch (rank) {
-                case 'J': value = 11; break;
-                case 'Q': value = 12; break;
-                case 'K': value = 13; break;
-                case 'A': value = 14; break;
+                case 'Jack': value = 11; break;
+                case 'Queen': value = 12; break;
+                case 'King': value = 13; break;
+                case 'Ace': value = 14; break;
                 default: value = parseInt(rank);
             }
             deck.push({ suit, rank, value });
@@ -146,7 +154,7 @@ export function startNewRound(gameState: types.GameState): void {
 
     // 5. Mutate the main GameState to begin the new round
     gameState.currentRoundState = newRound;
-
+    logAction("START_NEW_ROUND", { round: newRound }, gameState);
     console.log(`Logic: Round ${newRound.roundNumber} started. Dealer is Player ${dealerId}. Waiting for master suit selection.`);
 }
 // Add this new function to your src/gameLogic.ts file.
@@ -168,20 +176,7 @@ export function endRound(gameState: types.GameState): void {
     console.log(`Logic: Ending Round ${round.roundNumber}...`);
 
     // --- Step 1: Calculate Final Scores for the Round ---
-    const teamScores = {
-        Black: { tens: 0, tricks: 0 },
-        Red: { tens: 0, tricks: 0 }
-    };
-    for (const trick of round.playedTricks) {
-        const winningTeamName = gameState.players[trick.winnerId!]!.teamName!;
-        teamScores[winningTeamName].tricks++;
-        for (const play of trick.cardsPlayed) {
-            if (play.card.rank === '10') {
-                teamScores[winningTeamName].tens++;
-            }
-        }
-    }
-    round.scores = teamScores;
+    const teamScores = calculateScores(round, gameState);
     console.log(`Logic: Final Scores - Black: ${teamScores.Black.tens} tens, Red: ${teamScores.Red.tens} tens.`);
 
     // --- Step 2: Determine Round Winner ---
@@ -233,28 +228,52 @@ export function endRound(gameState: types.GameState): void {
     gameState.pastRounds.push(round);
     // Set the current round to null, ready for the next one
     gameState.currentRoundState = null;
+    logAction("END_ROUND", { round: round }, gameState);
+    console.log(`Logic: Round ${round.roundNumber} finalized. Next dealer will be Player ${nextDealerId}.`);
 }
+function calculateScores(round: types.RoundState, gameState: GameState) {
+    const teamScores = {
+        Black: { tens: 0, tricks: 0 },
+        Red: { tens: 0, tricks: 0 }
+    };
+    for (const trick of round.playedTricks) {
+        const winningTeamName = gameState.players[trick.winnerId!]!.teamName!;
+        teamScores[winningTeamName].tricks++;
+        for (const play of trick.cardsPlayed) {
+            if (play.card.rank === '10') {
+                teamScores[winningTeamName].tens++;
+            }
+        }
+    }
+    round.scores = teamScores;
+    return teamScores;
+}
+
 function findDealer(gameState: types.GameState): number {
     let dealerId: number = 0;
     if (gameState.pastRounds.length >= 1) {
         const lastRound = gameState.pastRounds[gameState.pastRounds.length - 1];
         if (lastRound && lastRound.nextDealerId) {
             dealerId = lastRound.nextDealerId;
+
         }
     } else {
         const tempDeck = shuffleDeck(createDeck());
         const drawnCards = tempDeck.slice(0, 4);
         let lowestCardValue = Infinity;
-        let dealerId = -1;
+        let initialDealerId = -1;
         drawnCards.forEach((card, index) => {
             if (card.value < lowestCardValue) {
                 lowestCardValue = card.value;
-                dealerId = index;
+                initialDealerId = index;
             }
         });
-        return dealerId;
+        logAction("FIND_DEALER", { initialDealerId }, gameState);
+        return initialDealerId;
     }
+    logAction("FIND_DEALER", { dealerId }, gameState);
     return dealerId;
+
 }
 
 /**
@@ -303,7 +322,7 @@ export function chooseMasterSuit(gameState: types.GameState, playerId: number, c
     // --- 4. UPDATE PHASE ---
     // The round is now ready for card play to begin.
     round.phase = 'playing';
-
+    logAction("CHOOSE_MASTER_SUIT", { playerId, chosenSuit }, gameState);
     console.log(`Logic: Round phase is now 'playing'.`);
 }
 
@@ -371,7 +390,7 @@ export function playCard(gameState: types.GameState, playerId: number, card: typ
     // Add card to the trick
     round.currentTrick.cardsPlayed.push({ playerId, card: cardInHand });
     console.log(`Logic: Player ${playerId} played ${card.rank} of ${card.suit}.`);
-
+    logAction("PLAY_CARD", { playerId, card: cardInHand }, gameState);
     return { success: true, message: 'Card played successfully.' };
 }
 
@@ -420,6 +439,7 @@ export function endTrick(gameState: types.GameState): void {
 
     // --- Update State ---
     round.playedTricks.push(trick);
+    calculateScores(round, gameState);
 
     // --- Setup the Next Trick ---
     const nextTrickId = round.playedTricks.length + 1;
@@ -434,10 +454,12 @@ export function endTrick(gameState: types.GameState): void {
     } else {
         endRound(gameState);
     }
+    logAction("END_TRICK", { trick: trick }, gameState);
 }
 
 export function removePlayer(state: GameState, playerId: number): void {
     state.players.splice(playerId, 1);
+
 
 }
 

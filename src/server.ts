@@ -10,13 +10,10 @@ import * as _ from './Game.js';
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
-const PORT = 3000;
+const PORT = 3001;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// ... (keep your existing imports and setup)
-
-// --- Game Management ---
 const gameStates: { [roomId: string]: GameState } = {};
 const socketToPlayerMap: { [socketId: string]: { roomId: string, playerId: number } } = {};
 
@@ -192,7 +189,8 @@ io.on('connection', (socket) => {
                     if (trickWinner) {
                         io.to(roomId).emit('trickResult', {
                             winnerId: trickWinner.id,
-                            winnerName: trickWinner.name
+                            winnerName: trickWinner.name,
+                            roundInfo: round.scores
                         });
                     }
                 }
@@ -273,6 +271,15 @@ io.on('connection', (socket) => {
             playerId: playerId
         });
     });
+    socket.on('requestPlayerData', ({ roomId }, callback) => {
+        const state = gameStates[roomId];
+        if (!state) return callback({ success: false });
+        callback({
+            success: true,
+            players: state.players.map(p => ({ id: p.id, name: p.name, team: p.teamName })),
+        });
+    });
+
 });
 
 httpServer.listen(PORT, () => {
